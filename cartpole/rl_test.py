@@ -44,23 +44,25 @@ class Cartpole_Agent(RL_Agent):
 
 
 # Setting RL environment and running simulations
-pg = PG_Learner(rl_agent=Cartpole_Agent("cartpole"), 
-                game_env=env,
-                discount=0.95, 
-                batch_size=100, 
-                lr=0.01)
-
-for i in range(100):
-    pg.step()
-
-
-# trpo = TRPO_Learner(rl_agent=Cartpole_Agent("cartpole"), 
-#                     game_env=env,
-#                     discount=0.99, 
-#                     batch_size=100, 
-#                     trpo_delta=0.02,
-#                     line_search_option="max")
+# pg = PG_Learner(rl_agent=Cartpole_Agent("cartpole"), 
+#                 game_env=env,
+#                 discount=0.95, 
+#                 batch_size=100, 
+#                 frame_cap=2000,
+#                 lr=0.01)
 
 # for i in range(100):
-#     trpo.step()
+#     pg.step()
+
+
+trpo = TRPO_Learner(rl_agent=Cartpole_Agent("cartpole"), 
+                    game_env=env,
+                    discount=0.99, 
+                    batch_size=100, 
+                    frame_cap=2000,
+                    trpo_delta=0.01,
+                    line_search_option="max")
+
+for i in range(100):
+    trpo.step()
     

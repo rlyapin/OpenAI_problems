@@ -10,13 +10,21 @@ from rl_utils import *
 # An abstract class supposed to store rl_env information and actually play the games
 class RL_Learner:
     
-    def __init__(self, rl_agent, game_env, discount, batch_size):
+    def __init__(self, rl_agent, game_env, discount=0.99, batch_size=50, frame_cap=None):
+        # Session is tensorflow session, "borrowed" from rl_agent definition
+        # rl_agent is the NN choosing actions + wrapper for grad calculations
+        # env is gym environment: black box for (state, action) -> (next_state, reward)
         self.session = rl_agent.session
         self.agent = rl_agent
         self.env = game_env
         
+        # discount - discount for normalization of future rewards
+        # batch_size - number of separate games in a batch (same NN weights)
+        # frame_cap - the cap on the number of frames for which reward, action, state are returned
+        # frame_cap may be needed for PG and (especially) TRPO to speed up computations
         self.discount = discount
         self.batch_size = batch_size
+        self.frame_cap = frame_cap
         
         self.reward_history = []
         self.played_games = 0
@@ -63,16 +71,23 @@ class RL_Learner:
               ": ", sum(self.reward_history[-self.batch_size:]) / self.batch_size
         
         concat_states = reduce(lambda x, y: np.concatenate((x, y), axis=0), all_states)
-        concat_actions = reduce(lambda x, y: x + y, all_actions)
-        concat_rewards = reduce(lambda x, y: x + y, all_rewards)     
+        concat_actions = np.array(reduce(lambda x, y: x + y, all_actions))
+        concat_rewards = np.array(reduce(lambda x, y: x + y, all_rewards))
+
+        # Selecting a subset of all frames uniformly at random if there is a cap
+        if self.frame_cap is not None:
+            picked_frames = np.random.choice(concat_states.shape[0], size=self.frame_cap, replace=True)
+            concat_states = concat_states[picked_frames, :]
+            concat_actions = concat_actions[picked_frames]
+            concat_rewards = concat_rewards[picked_frames]
         
         return concat_states, concat_actions, concat_rewards
 
 # Implementation of policy gradient learner
 class PG_Learner(RL_Learner):
     
-    def __init__(self, rl_agent, game_env, discount, batch_size, lr=0.1):
-        RL_Learner.__init__(self, rl_agent, game_env, discount, batch_size)
+    def __init__(self, rl_agent, game_env, discount=0.99, batch_size=50, frame_cap=None, lr=0.1):
+        RL_Learner.__init__(self, rl_agent, game_env, discount, batch_size, frame_cap)
         self.lr = lr
         
     def step(self):
@@ -80,8 +95,8 @@ class PG_Learner(RL_Learner):
         
         concat_states, concat_actions, concat_rewards = self.play_batch()
         grad_reward = self.agent.pg_grad(concat_states,
-                                         tf.constant(concat_actions),
-                                         tf.constant(concat_rewards))  / self.batch_size
+                                         concat_actions,
+                                         concat_rewards)  / self.batch_size
         
         grads = unflatten_gradient(tf.constant(self.lr * grad_reward, dtype=tf.float32), self.agent.model_variables())
         for (grad, var) in zip(grads, self.agent.model_variables()):
@@ -90,8 +105,9 @@ class PG_Learner(RL_Learner):
 # Implementation of TRPO learner
 class TRPO_Learner(RL_Learner):
     
-    def __init__(self, rl_agent, game_env, discount, batch_size, trpo_delta=0.01, line_search_option="max"):
-        RL_Learner.__init__(self, rl_agent, game_env, discount, batch_size)
+    def __init__(self, rl_agent, game_env, discount, batch_size, frame_cap=None, 
+                 trpo_delta=0.01, line_search_option="max"):
+        RL_Learner.__init__(self, rl_agent, game_env, discount, batch_size, frame_cap)
         self.trpo_delta = trpo_delta
         # Line search options could be: 
         # * "none": trpo step is taken without checking actual KL-divergence
@@ -128,8 +144,8 @@ class TRPO_Learner(RL_Learner):
         concat_states, concat_actions, concat_rewards = self.play_batch()
         
         grad_reward = self.agent.trpo_grad(concat_states,
-                                           tf.constant(concat_actions),
-                                           tf.constant(concat_rewards))  / self.batch_size
+                                           concat_actions,
+                                           concat_rewards)  / self.batch_size
         
         Ax_fun = lambda x: self.agent.fisher_vector_product(concat_states, tf.constant(x, dtype=tf.float32))
         

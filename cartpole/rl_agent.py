@@ -66,7 +66,7 @@ class RL_Agent:
         # I take the ratio of probabilities from original weights and probs from proposed weights (var + d_var)
         # These ratios are weighted by Q-values: thus, if output > 1 new weights make better actions more probable
         # Also, wighout scaling by original probs, its gradient is given by grad_log_prob_actions
-        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1)
+        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1, dtype=tf.float32)
         
         original_prob_actions = tf.reduce_sum(action_mask * self.prob_layer, axis=1)
         np_original_prob_actions = self.session.run(original_prob_actions, feed_dict={self.input_layer: states})
