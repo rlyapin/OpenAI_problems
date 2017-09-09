@@ -1,0 +1,111 @@
+import tensorflow as tf
+import numpy as np
+from rl_utils import *
+
+# Defining a class for RL agent: should be possible to use it with either
+# policy gradient and trpo methods
+class RL_Agent:
+    
+    def __init__(self, model_name):
+        with tf.variable_scope(model_name):
+            self.model_name = model_name
+            self.session = tf.Session()
+            
+            self.input_layer = tf.placeholder(shape=[None, 4], dtype=tf.float32)
+            self.dense1_layer = tf.layers.dense(self.input_layer, 
+                                                units=4, use_bias=True, 
+                                                activation=tf.nn.relu, name="dense1_weights"
+                                               )
+            
+            self.dense2_layer = tf.layers.dense(self.dense1_layer, 
+                                                units=2, use_bias=True, 
+                                                activation=tf.nn.relu, name="dense2_weights"
+                                               ) 
+            
+            self.prob_layer = tf.maximum(tf.minimum(tf.nn.softmax(self.dense2_layer), 0.9999), 0.0001)
+            self.log_prob_layer = tf.log(self.prob_layer)
+                        
+            self.session.run(tf.global_variables_initializer())
+
+    def model_variables(self):
+        return [x for x in tf.trainable_variables() if self.model_name in x.name]
+    
+    def model_size(self):
+        var_sizes = [tf.size(x) for x in self.model_variables()]
+        return self.session.run(tf.reduce_sum(var_sizes))
+    
+    def variable_size(self):
+        var_sizes = [tf.size(x) for x in self.model_variables()]
+        return self.session.run(var_sizes)
+            
+    def predict(self, states):
+        return self.session.run(self.prob_layer, feed_dict={self.input_layer: states})
+    
+    def pg_grad(self, states, actions, rewards):
+        # Calculating base policy gradient
+        # Return a sum of log_prob gradients weighted by discounted sum of future rewards
+        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1)
+        picked_log_prob_actions = tf.reduce_sum(action_mask * self.log_prob_layer, axis=1)
+        weighted_log_prob_actions = picked_log_prob_actions * rewards
+        grad_log_prob_actions = get_flattened_gradients(weighted_log_prob_actions, self.model_variables())
+        return self.session.run(grad_log_prob_actions, feed_dict={self.input_layer: states})
+
+    def trpo_grad(self, states, actions, rewards):
+        # Calculating the target gradient as defined in section 5 of the trpo paper
+        # Takes a gradient of prob action ratio weighted by Q-values
+        # Essentially it should be a gradient for compare_prob_ratios function
+        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1)
+        fixed_prob_actions = tf.stop_gradient(self.prob_layer)
+        prob_ratio = self.prob_layer / fixed_prob_actions
+        masked_prob_ratio = tf.reduce_sum(action_mask * prob_ratio, axis=1)
+        weighted_prob_ratio = masked_prob_ratio * rewards
+        trpo_gradient = get_flattened_gradients(weighted_prob_ratio, self.model_variables())
+        return self.session.run(trpo_gradient, feed_dict={self.input_layer: states})
+    
+    def fisher_vector_product(self, states, vector):
+        # This function is supposed to return the product of estimated fisher information matrix and a specified vector
+        # As I hope to reliably estimate this matrix, I take all states accumulated in a batch of games
+        expected_log_prob = tf.reduce_sum(tf.stop_gradient(self.prob_layer) * self.log_prob_layer, axis=1)
+        log_prob_grad = get_flattened_gradients(expected_log_prob, self.model_variables())
+        grad_vector_product = tf.reduce_sum(log_prob_grad * vector)
+        fisher_vector_product = -get_flattened_gradients(grad_vector_product, self.model_variables()) / states.shape[0]
+        return self.session.run(fisher_vector_product, feed_dict={self.input_layer: states})        
+    
+    def compare_prob_ratios(self, states, actions, rewards, d_var):
+        # Estimates the function to optimize as defined is section 5 of original paper
+        # I take the ratio of probabilities from original weights and probs from proposed weights (var + d_var)
+        # These ratios are weighted by Q-values: thus, if output > 1 new weights make better actions more probable
+        # Also, wighout scaling by original probs, its gradient is given by grad_log_prob_actions
+        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1)
+        
+        original_prob_actions = tf.reduce_sum(action_mask * self.prob_layer, axis=1)
+        np_original_prob_actions = self.session.run(original_prob_actions, feed_dict={self.input_layer: states})
+
+        for (grad, var) in zip(d_var, self.model_variables()):
+            self.session.run(tf.assign_add(var, grad))
+            
+        new_prob_actions = tf.reduce_sum(action_mask * self.prob_layer, axis=1)   
+        np_new_prob_actions = self.session.run(new_prob_actions, feed_dict={self.input_layer: states})
+
+        for (grad, var) in zip(d_var, self.model_variables()):
+            self.session.run(tf.assign_sub(var, grad))
+            
+        return sum((np_new_prob_actions / np_original_prob_actions) * np.array(rewards))
+
+    def estimate_kl_divergence(self, states, d_var):
+        # This function calculates an actual kl_divergence between action prob distributions
+        # with current weights and weight + d_var
+        original_probs = self.session.run(self.prob_layer, feed_dict={self.input_layer: states})
+        original_log_probs = self.session.run(self.log_prob_layer, feed_dict={self.input_layer: states})
+
+        for (grad, var) in zip(d_var, self.model_variables()):
+            self.session.run(tf.assign_add(var, grad))
+            
+        new_log_probs = self.session.run(self.log_prob_layer, feed_dict={self.input_layer: states})
+
+        for (grad, var) in zip(d_var, self.model_variables()):
+            self.session.run(tf.assign_sub(var, grad))
+            
+        kl = original_probs * (original_log_probs - new_log_probs)
+        return np.sum(kl) / kl.shape[0]
+                
