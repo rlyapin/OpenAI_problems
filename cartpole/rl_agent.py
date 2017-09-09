@@ -5,27 +5,17 @@ from rl_utils import *
 # Defining a class for RL agent: should be possible to use it with either
 # policy gradient and trpo methods
 class RL_Agent:
-    
+    # Currently RL_Agent is supposed to be an abstract class:
+    # It provides implemetation of methods to calculates gradients for TRPO and PG methods
+    # However, the actual NN config to choose actions is left for inherited classes
     def __init__(self, model_name):
-        with tf.variable_scope(model_name):
-            self.model_name = model_name
-            self.session = tf.Session()
-            
-            self.input_layer = tf.placeholder(shape=[None, 4], dtype=tf.float32)
-            self.dense1_layer = tf.layers.dense(self.input_layer, 
-                                                units=4, use_bias=True, 
-                                                activation=tf.nn.relu, name="dense1_weights"
-                                               )
-            
-            self.dense2_layer = tf.layers.dense(self.dense1_layer, 
-                                                units=2, use_bias=True, 
-                                                activation=tf.nn.relu, name="dense2_weights"
-                                               ) 
-            
-            self.prob_layer = tf.maximum(tf.minimum(tf.nn.softmax(self.dense2_layer), 0.9999), 0.0001)
-            self.log_prob_layer = tf.log(self.prob_layer)
-                        
-            self.session.run(tf.global_variables_initializer())
+        # Just specifying which methods are need to be defined / overwritten ib inherited classes
+        self.model_name = model_name
+
+        self.session = None
+        self.input_layer = None
+        self.prob_layer = None
+        self.log_prob_layer = None
 
     def model_variables(self):
         return [x for x in tf.trainable_variables() if self.model_name in x.name]
