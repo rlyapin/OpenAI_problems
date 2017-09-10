@@ -8,9 +8,6 @@ from rl_env import PG_Learner
 from rl_env import TRPO_Learner
 
 
-print tf.__version__
-tf.reset_default_graph()
-
 env = gym.make('CartPole-v1')
 env.reset()
 
@@ -42,27 +39,40 @@ class Cartpole_Agent(RL_Agent):
                         
             self.session.run(tf.global_variables_initializer())
 
+out_filename = "simulations/cartpole_pg_lr_0.1_batchsize_100_framecap_none_discount_0.95.txt"
+n_reruns = 100
 
-# Setting RL environment and running simulations
-# pg = PG_Learner(rl_agent=Cartpole_Agent("cartpole"), 
-#                 game_env=env,
-#                 discount=0.95, 
-#                 batch_size=100, 
-#                 frame_cap=2000,
-#                 lr=0.01)
-
-# for i in range(100):
-#     pg.step()
-
-
-trpo = TRPO_Learner(rl_agent=Cartpole_Agent("cartpole"), 
+for i in range(n_reruns):
+    #Setting RL environment and running simulations
+    tf.reset_default_graph()
+    pg = PG_Learner(rl_agent=Cartpole_Agent("cartpole"), 
                     game_env=env,
-                    discount=0.99, 
+                    discount=0.95, 
                     batch_size=100, 
                     frame_cap=2000,
-                    trpo_delta=0.01,
-                    line_search_option="max")
+                    lr=0.01)
 
-for i in range(100):
-    trpo.step()
-    
+    for i in range(10):
+        pg.step()
+
+    with open(out_filename, "a") as f:
+        f.write(" ".join(str(x) for x in pg.reward_history) + "\n")
+
+# out_filename = "simulations/cartpole_trpo_delta_0.01_batchsize_100_framecap_2000_discount_0.99.txt"
+# n_reruns = 100
+
+# for i in range(n_reruns):
+    # tf.reset_default_graph()
+    # trpo = TRPO_Learner(rl_agent=Cartpole_Agent("cartpole"), 
+    #                     game_env=env,
+    #                     discount=0.99, 
+    #                     batch_size=100, 
+    #                     frame_cap=2000,
+    #                     trpo_delta=0.01,
+    #                     line_search_option="max")
+
+    # for i in range(100):
+    #     trpo.step()
+
+    # with open(out_filename, "a") as f:
+    #     f.write(" ".join(str(x) for x in trpo.reward_history) + "\n")

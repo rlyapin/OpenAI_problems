@@ -1,2 +1,5 @@
+cartpole/simulations
+
+.DS_Store
 .ipynb_checkpoints
 *.pyc
