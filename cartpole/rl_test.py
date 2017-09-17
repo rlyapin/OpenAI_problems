@@ -2,7 +2,7 @@
 import gym
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
+import itertools
 from rl_agent import RL_Agent
 from rl_env import PG_Learner
 from rl_env import TRPO_Learner
@@ -39,24 +39,42 @@ class Cartpole_Agent(RL_Agent):
                         
             self.session.run(tf.global_variables_initializer())
 
-out_filename = "simulations/cartpole_pg_lr_0.1_batchsize_100_framecap_none_discount_0.95.txt"
 n_reruns = 100
 
-for i in range(n_reruns):
-    #Setting RL environment and running simulations
-    tf.reset_default_graph()
-    pg = PG_Learner(rl_agent=Cartpole_Agent("cartpole"), 
-                    game_env=env,
-                    discount=0.95, 
-                    batch_size=100, 
-                    frame_cap=2000,
-                    lr=0.01)
+lrs = [0.01, 0.1]
+batch_sizes = [10, 25, 100]
+frame_caps = [None, 2000]
+discounts = [0.95, 0.99]
+properties = [lrs, batch_sizes, frame_caps, discounts]
+properties_names = ["lr", "batch_size", "frame_cap", "discount"]
+for x in itertools.product(*properties):
 
-    for i in range(10):
-        pg.step()
+    # Determining file to store simulations results
+    out_filename = "simulations/cartpole_pg" 
+    for i in range(len(x)):
+        out_filename += "_" + properties_names[i] + "_" + str(x[i])
+    out_filename += ".txt"
 
-    with open(out_filename, "a") as f:
-        f.write(" ".join(str(x) for x in pg.reward_history) + "\n")
+    # Determining the number of gradient steps
+    grad_steps = 10000 / x[1]
+
+    for i in range(n_reruns):
+        #Setting RL environment and running simulations
+        print out_filename
+        print "Rerun #", i + 1
+        tf.reset_default_graph()
+        pg = PG_Learner(rl_agent=Cartpole_Agent("cartpole"), 
+                        game_env=env,
+                        discount=x[3], 
+                        batch_size=x[1], 
+                        frame_cap=x[2],
+                        lr=x[0])
+
+        for i in range(grad_steps):
+            pg.step()
+
+        with open(out_filename, "a") as f:
+            f.write(" ".join(str(x) for x in pg.reward_history) + "\n")
 
 # out_filename = "simulations/cartpole_trpo_delta_0.01_batchsize_100_framecap_2000_discount_0.99.txt"
 # n_reruns = 100
