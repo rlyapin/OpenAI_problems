@@ -34,7 +34,7 @@ class RL_Learner:
         actions = []
         rewards = []
         
-        observation = self.env.reset().reshape((1, 4))
+        observation = np.expand_dims(self.env.reset(), axis=0)
         done = False
         
         while done == False:
@@ -46,7 +46,7 @@ class RL_Learner:
             action = np.random.choice(np.arange(len(prob_actions)), p=prob_actions)
             actions.append(action)
             observation, reward, done, info = self.env.step(action)
-            observation = observation.reshape((1, 4))
+            observation = np.expand_dims(observation, axis=0)
             rewards.append(reward)
             
         self.reward_history.append(sum(rewards))

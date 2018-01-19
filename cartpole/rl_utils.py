@@ -31,7 +31,7 @@ def sum_discounted_rewards(rewards, discount):
     pointer = len(rewards) - 1
     acc_discounted_sum = rewards[-1]
     while pointer > 0:
-        acc_discounted_sum *= 0.95
+        acc_discounted_sum *= discount
         pointer -= 1
         discounted_rewards[pointer] += acc_discounted_sum
         acc_discounted_sum += rewards[pointer]
