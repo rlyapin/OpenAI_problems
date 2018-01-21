@@ -3,9 +3,12 @@ import gym
 import numpy as np
 import tensorflow as tf
 import itertools
+import sys
+sys.path.append("..")
+
 from rl_agent import RL_Agent
-from rl_env import PG_Learner
-from rl_env import TRPO_Learner
+from rl_learner import PG_Learner
+from rl_learner import TRPO_Learner
 
 
 env = gym.make('CartPole-v1')
