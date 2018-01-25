@@ -2,6 +2,7 @@ cartpole/simulations
 flappy_bird/simulations
 pong/simulations
 
+.idea
 .DS_Store
 .ipynb_checkpoints
 *.pyc
