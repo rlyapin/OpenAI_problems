@@ -17,6 +17,8 @@ class RL_Agent:
         self.prob_layer = None
         self.log_prob_layer = None
 
+        self.n_actions = int(self.prob_layer.shape.dims[1])
+
     def model_variables(self):
         return [x for x in tf.trainable_variables() if self.model_name in x.name]
     
@@ -34,7 +36,7 @@ class RL_Agent:
     def pg_grad(self, states, actions, rewards):
         # Calculating base policy gradient
         # Return a sum of log_prob gradients weighted by discounted sum of future rewards
-        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1)
+        action_mask = tf.one_hot(actions, depth=self.n_actions, on_value=1.0, off_value=0.0, axis=-1)
         picked_log_prob_actions = tf.reduce_sum(action_mask * self.log_prob_layer, axis=1)
         weighted_log_prob_actions = picked_log_prob_actions * rewards
         grad_log_prob_actions = get_flattened_gradients(weighted_log_prob_actions, self.model_variables())
@@ -44,7 +46,7 @@ class RL_Agent:
         # Calculating the target gradient as defined in section 5 of the trpo paper
         # Takes a gradient of prob action ratio weighted by Q-values
         # Essentially it should be a gradient for compare_prob_ratios function
-        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1)
+        action_mask = tf.one_hot(actions, depth=self.n_actions, on_value=1.0, off_value=0.0, axis=-1)
         fixed_prob_actions = tf.stop_gradient(self.prob_layer)
         prob_ratio = self.prob_layer / fixed_prob_actions
         masked_prob_ratio = tf.reduce_sum(action_mask * prob_ratio, axis=1)
@@ -66,7 +68,7 @@ class RL_Agent:
         # I take the ratio of probabilities from original weights and probs from proposed weights (var + d_var)
         # These ratios are weighted by Q-values: thus, if output > 1 new weights make better actions more probable
         # Also, wighout scaling by original probs, its gradient is given by grad_log_prob_actions
-        action_mask = tf.one_hot(actions, depth=2, on_value=1.0, off_value=0.0, axis=-1, dtype=tf.float32)
+        action_mask = tf.one_hot(actions, depth=self.n_actions, on_value=1.0, off_value=0.0, axis=-1, dtype=tf.float32)
         
         original_prob_actions = tf.reduce_sum(action_mask * self.prob_layer, axis=1)
         np_original_prob_actions = self.session.run(original_prob_actions, feed_dict={self.input_layer: states})
