@@ -163,11 +163,11 @@ class TetrisEnv:
 
     def clear_filled_rows(self):
         # Function to confirm reward and get rid of filled rows
-        filled_indices = np.nonzero(np.sum(test.field, axis=0) == 10)[0]
-        remaining_indices = np.nonzero(np.sum(test.field, axis=0) < 10)[0]
+        filled_indices = np.nonzero(np.sum(self.field, axis=0) == 10)[0]
+        remaining_indices = np.nonzero(np.sum(self.field, axis=0) < 10)[0]
         reward = len(filled_indices)
         if reward > 0:
-            test.field = np.vstack((test.field[:, remaining_indices], np.zeros(10, reward)))
+            self.field = np.vstack((self.field[:, remaining_indices], np.zeros(10, reward)))
         return reward
 
     def step(self, action):
