@@ -35,16 +35,15 @@ class RL_Learner:
         rewards = []
         
         observation = np.expand_dims(self.env.reset(), axis=0)
-        states.append(observation)
         done = False
         
         while done == False:
+            states.append(observation)
             prob_actions = self.agent.predict(observation)[0]
             action = np.random.choice(np.arange(len(prob_actions)), p=prob_actions)
             actions.append(action)
             observation, reward, done, info = self.env.step(action)
             observation = np.expand_dims(observation, axis=0)
-            states.append(observation)
             rewards.append(reward)
             
         states = np.concatenate(states, axis=0)
@@ -67,7 +66,7 @@ class RL_Learner:
             all_rewards.append(sum_discounted_rewards(rewards, self.discount))
             
         print "Average reward for batch #", self.played_games / self.batch_size, \
-              ": ", sum(self.reward_history[-self.batch_size:]) / self.batch_size
+              ": ", sum(self.reward_history[-self.batch_size:]) / float(self.batch_size)
         
         concat_states = np.concatenate(all_states, axis=0)
         concat_actions = np.array(reduce(lambda x, y: x + y, all_actions))

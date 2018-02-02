@@ -11,13 +11,12 @@ class RL_Agent:
     def __init__(self, model_name):
         # Just specifying which methods are need to be defined / overwritten ib inherited classes
         self.model_name = model_name
+        self.n_actions = None
 
         self.session = None
         self.input_layer = None
         self.prob_layer = None
         self.log_prob_layer = None
-
-        self.n_actions = int(self.prob_layer.shape.dims[1])
 
     def model_variables(self):
         return [x for x in tf.trainable_variables() if self.model_name in x.name]

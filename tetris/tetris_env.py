@@ -122,6 +122,7 @@ class TetrisEnv:
         self.falling_tetromino = Tetromino(np.random.choice(TETROMINO_LETTERS))
         self.field = np.zeros((10, 20))
         self.done = False
+        self.info = ""
 
     def show_frame(self):
         # Showing current status of the game
@@ -167,7 +168,7 @@ class TetrisEnv:
         remaining_indices = np.nonzero(np.sum(self.field, axis=0) < 10)[0]
         reward = len(filled_indices)
         if reward > 0:
-            self.field = np.vstack((self.field[:, remaining_indices], np.zeros(10, reward)))
+            self.field = np.hstack([self.field[:, remaining_indices], np.zeros((10, reward))])
         return reward
 
     def step(self, action):
@@ -180,7 +181,7 @@ class TetrisEnv:
         # 3 - rotate clockwise
         if self.done:
             final_frame = self.show_frame()
-            return final_frame, 0, self.done
+            return final_frame, 0, self.done, self.info
         else:
             # Updating number of iterations and stopping the game if necessary
             self.iter += 1
@@ -197,7 +198,7 @@ class TetrisEnv:
             self.falling_tetromino.move_down()
             if self.check_feasibility() == True:
                 return_frame = self.show_frame()
-                return return_frame, 0, self.done
+                return return_frame, 0, self.done, self.info
 
             # If it is invalid that means the floor or other block below are reached:
             # In this case I reverse the down move and add the tetromino to the playing field
@@ -217,7 +218,7 @@ class TetrisEnv:
                     self.done = True
 
                 return_frame = self.show_frame()
-                return return_frame, reward, self.done
+                return return_frame, reward, self.done, self.info
 
 # Small script to test game execution
 # import time
