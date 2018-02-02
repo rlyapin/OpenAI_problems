@@ -100,6 +100,40 @@ class PG_Learner(RL_Learner):
         for (grad, var) in zip(grads, self.agent.model_variables()):
             self.session.run(tf.assign_add(var, grad))  
 
+# Implementation of A3C learner
+class A3C_Learner(RL_Learner):
+    
+    def __init__(self, actor_agent, critic_agent, game_env, 
+                 discount=0.99, batch_size=50, frame_cap=None, actor_lr=0.01, critic_lr=0.01):
+        RL_Learner.__init__(self, actor_agent, game_env, discount, batch_size, frame_cap)
+        self.critic_agent = critic_agent
+        self.actor_lr = actor_lr
+        self.critic_lr = critic_lr
+
+    def step(self):
+        # One policy gradient step based on one batch of games
+        
+        concat_states, concat_actions, concat_rewards = self.play_batch()
+        concat_baselines = self.critic_agent.evaluate_states(concat_states)
+
+        # Gradient step for actor
+        grad_reward = self.agent.pg_grad(concat_states,
+                                         concat_actions,
+                                         concat_rewards,
+                                         concat_baselines)  / self.batch_size
+        
+        grads = unflatten_gradient(tf.constant(self.actor_lr * grad_reward, dtype=tf.float32), self.agent.model_variables())
+        for (grad, var) in zip(grads, self.agent.model_variables()):
+            self.session.run(tf.assign_add(var, grad)) 
+
+        # Gradient step for critic
+        critic_grad = self.critic_agent.critic_grad(concat_states,
+                                                    concat_rewards)  / self.batch_size
+        
+        grads = unflatten_gradient(tf.constant(self.critic_lr * critic_grad, dtype=tf.float32), self.critic_agent.model_variables())
+        for (grad, var) in zip(grads, self.critic_agent.model_variables()):
+            self.session.run(tf.assign_sub(var, grad)) 
+
 # Implementation of TRPO learner
 class TRPO_Learner(RL_Learner):
     

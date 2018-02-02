@@ -18,6 +18,12 @@ class RL_Agent:
         self.prob_layer = None
         self.log_prob_layer = None
 
+        self.state_value = None
+
+    ###
+    # Maintenance section
+    ###
+
     def model_variables(self):
         return [x for x in tf.trainable_variables() if self.model_name in x.name]
     
@@ -28,18 +34,43 @@ class RL_Agent:
     def variable_size(self):
         var_sizes = [tf.size(x) for x in self.model_variables()]
         return self.session.run(var_sizes)
+
+    ###
+    # Actor section
+    ###
             
     def predict(self, states):
         return self.session.run(self.prob_layer, feed_dict={self.input_layer: states})
     
-    def pg_grad(self, states, actions, rewards):
+    def pg_grad(self, states, actions, rewards, baselines=None):
         # Calculating base policy gradient
         # Return a sum of log_prob gradients weighted by discounted sum of future rewards
         action_mask = tf.one_hot(actions, depth=self.n_actions, on_value=1.0, off_value=0.0, axis=-1)
         picked_log_prob_actions = tf.reduce_sum(action_mask * self.log_prob_layer, axis=1)
-        weighted_log_prob_actions = picked_log_prob_actions * rewards
+        if baselines is None:
+            weighted_log_prob_actions = picked_log_prob_actions * rewards
+        else:
+            weighted_log_prob_actions = picked_log_prob_actions * (rewards - baselines)
         grad_log_prob_actions = get_flattened_gradients(weighted_log_prob_actions, self.model_variables())
         return self.session.run(grad_log_prob_actions, feed_dict={self.input_layer: states})
+
+    ###
+    # Critic section
+    ###
+            
+    def evaluate_states(self, states):
+        return self.session.run(self.state_value, feed_dict={self.input_layer: states})
+
+    def critic_grad(self, states, rewards):
+        # Calculating gradient of a critic agent
+        # The implied loss is (R - V(s)) ** 2
+        critic_loss = tf.reduce_sum(tf.square(rewards - self.state_value))
+        grad_loss = get_flattened_gradients(critic_loss, self.model_variables())
+        return self.session.run(grad_loss, feed_dict={self.input_layer: states})
+
+    ###
+    # TRPO section
+    ###
 
     def trpo_grad(self, states, actions, rewards):
         # Calculating the target gradient as defined in section 5 of the trpo paper
