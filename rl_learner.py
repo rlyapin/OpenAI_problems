@@ -10,11 +10,11 @@ from rl_utils import *
 # An abstract class supposed to store rl_env information and actually play the games
 class RL_Learner:
     
-    def __init__(self, rl_agent, game_env, discount=0.99, batch_size=50, frame_cap=None):
+    def __init__(self, session, rl_agent, game_env, discount=0.99, batch_size=50, frame_cap=None):
         # Session is tensorflow session, "borrowed" from rl_agent definition
         # rl_agent is the NN choosing actions + wrapper for grad calculations
         # env is gym environment: black box for (state, action) -> (next_state, reward)
-        self.session = rl_agent.session
+        self.session = session
         self.agent = rl_agent
         self.env = game_env
         
@@ -47,7 +47,9 @@ class RL_Learner:
             rewards.append(reward)
             
         states = np.concatenate(states, axis=0)
-        self.reward_history.append(sum(rewards))
+        actions = np.array(actions).reshape((-1, 1))
+        rewards = np.array(rewards).reshape((-1, 1))
+        self.reward_history.append(np.sum(rewards))
         self.played_games += 1
             
         return states, actions, rewards
@@ -69,23 +71,23 @@ class RL_Learner:
               ": ", sum(self.reward_history[-self.batch_size:]) / float(self.batch_size)
         
         concat_states = np.concatenate(all_states, axis=0)
-        concat_actions = np.array(reduce(lambda x, y: x + y, all_actions))
-        concat_rewards = np.array(reduce(lambda x, y: x + y, all_rewards))
+        concat_actions = np.concatenate(all_actions, axis=0)
+        concat_rewards = np.concatenate(all_rewards, axis=0)
 
         # Selecting a subset of all frames uniformly at random if there is a cap
         if self.frame_cap is not None:
             picked_frames = np.random.choice(concat_states.shape[0], size=self.frame_cap, replace=True)
             concat_states = concat_states[picked_frames, :]
-            concat_actions = concat_actions[picked_frames]
-            concat_rewards = concat_rewards[picked_frames]
+            concat_actions = concat_actions[picked_frames, :]
+            concat_rewards = concat_rewards[picked_frames, :]
         
         return concat_states, concat_actions, concat_rewards
 
 # Implementation of policy gradient learner
 class PG_Learner(RL_Learner):
     
-    def __init__(self, rl_agent, game_env, discount=0.99, batch_size=50, frame_cap=None, lr=0.1):
-        RL_Learner.__init__(self, rl_agent, game_env, discount, batch_size, frame_cap)
+    def __init__(self, session, rl_agent, game_env, discount=0.99, batch_size=50, frame_cap=None, lr=0.1):
+        RL_Learner.__init__(self, session, rl_agent, game_env, discount, batch_size, frame_cap)
         self.lr = lr
         
     def step(self):
@@ -103,9 +105,9 @@ class PG_Learner(RL_Learner):
 # Implementation of A3C learner
 class A3C_Learner(RL_Learner):
     
-    def __init__(self, actor_agent, critic_agent, game_env, 
+    def __init__(self, session, actor_agent, critic_agent, game_env, 
                  discount=0.99, batch_size=50, frame_cap=None, actor_lr=0.01, critic_lr=0.01):
-        RL_Learner.__init__(self, actor_agent, game_env, discount, batch_size, frame_cap)
+        RL_Learner.__init__(self, session, actor_agent, game_env, discount, batch_size, frame_cap)
         self.critic_agent = critic_agent
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
@@ -137,9 +139,9 @@ class A3C_Learner(RL_Learner):
 # Implementation of TRPO learner
 class TRPO_Learner(RL_Learner):
     
-    def __init__(self, rl_agent, game_env, discount, batch_size, frame_cap=None, 
+    def __init__(self, session, rl_agent, game_env, discount, batch_size, frame_cap=None, 
                  trpo_delta=0.01, line_search_option="max"):
-        RL_Learner.__init__(self, rl_agent, game_env, discount, batch_size, frame_cap)
+        RL_Learner.__init__(self, session, rl_agent, game_env, discount, batch_size, frame_cap)
         self.trpo_delta = trpo_delta
         # Line search options could be: 
         # * "none": trpo step is taken without checking actual KL-divergence

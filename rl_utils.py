@@ -27,7 +27,7 @@ def unflatten_gradient(grad, var_list):
     return grads
 
 def sum_discounted_rewards(rewards, discount):
-    discounted_rewards = list(rewards)
+    discounted_rewards = np.array(rewards)
     pointer = len(rewards) - 1
     acc_discounted_sum = rewards[-1]
     while pointer > 0:
